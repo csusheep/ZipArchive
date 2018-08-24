@@ -41,6 +41,45 @@ BOOL _fileIsSymbolicLink(const unz_file_info *fileInfo);
     zipFile _zip;
 }
 
+#pragma mark - uas
+
++ (BOOL)uas_createZipFileAtPath:(NSString *)path withContentsOfDirectory:(NSString *)directoryPath keepParentDirectory:(BOOL)keepParentDirectory {
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    NSDirectoryEnumerator *dirEnumerator = [fileManager enumeratorAtPath:directoryPath];
+    NSArray<NSString *> *allObjects = dirEnumerator.allObjects;
+    NSUInteger total = allObjects.count, complete = 0;
+    SSZipArchive *zipArchive = [[SSZipArchive alloc] initWithPath:path];
+    BOOL success = [zipArchive open];
+    if (success) {
+        // use a local fileManager (queue/thread compatibility)
+        NSString *fileName;
+        for (fileName in allObjects) {
+            BOOL isDir;
+            NSString *fullFilePath = [directoryPath stringByAppendingPathComponent:fileName];
+            [fileManager fileExistsAtPath:fullFilePath isDirectory:&isDir];
+            
+            if (keepParentDirectory)
+            {
+                fileName = [directoryPath.lastPathComponent stringByAppendingPathComponent:fileName];
+            }
+            
+            if (!isDir) {
+                success &= [zipArchive writeFileAtPath:fullFilePath withFileName:fileName compressionLevel:-1 password:nil AES:YES];
+            }
+            else
+            {
+                if ([[NSFileManager defaultManager] subpathsOfDirectoryAtPath:fullFilePath error:nil].count == 0)
+                {
+                    success &= [zipArchive writeFolderAtPath:fullFilePath withFolderName:fileName withPassword:nil];
+                }
+            }
+            complete++;
+        }
+        success &= [zipArchive close];
+    }
+    return success;
+}
+
 #pragma mark - Password check
 
 + (BOOL)isFilePasswordProtectedAtPath:(NSString *)path {
